@@ -599,7 +599,7 @@ function renderApps() {
   const hero = $("apps-hero-text");
   hero.replaceChildren(
     unused.length
-      ? h("span", {}, h("b", {}, `${unused.length} ${plural(unused.length, "приложение", "приложения", "приложений")}`), ` не запускались больше ${UNUSED_DAYS} дней. Удалите то, что не нужно, — для игр Steam сохранения обычно остаются в облаке.`)
+      ? h("span", {}, h("b", {}, `${unused.length} ${plural(unused.length, "приложение", "приложения", "приложений")}`), ` не запускались больше ${UNUSED_DAYS} дней.`)
       : h("span", {}, "Все программы, о которых есть данные, запускались за последние два месяца.")
   );
   $("tip-apps-num").textContent = unused.length ? fmtBytes(unusedSize) : "0";
