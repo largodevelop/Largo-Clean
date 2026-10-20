@@ -27,6 +27,15 @@ contextBridge.exposeInMainWorld("largo", {
   icon: (file) => ipcRenderer.invoke("apps:icon", file),
   onAppsProgress: on("apps:progress"),
 
+  hwState: () => ipcRenderer.invoke("hw:state"),
+  onHwSample: on("hw:sample"),
+  onFps: on("hw:fps"),
+  setFan: (id, cfg) => ipcRenderer.invoke("fan:set", id, cfg),
+  setOverlay: (patch) => ipcRenderer.invoke("overlay:set", patch).then((r) => (ipcRenderer.send("overlay:changed"), r)),
+  onOverlaySettings: on("overlay:settings"),
+  installPawnio: () => ipcRenderer.invoke("hw:installPawnio"),
+  quit: () => ipcRenderer.invoke("app:quit"),
+
   reveal: (p) => ipcRenderer.invoke("shell:reveal", p),
   open: (p) => ipcRenderer.invoke("shell:open", p),
   minimize: () => ipcRenderer.invoke("window:minimize"),

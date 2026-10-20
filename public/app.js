@@ -695,6 +695,353 @@ $("btn-update").onclick = () => api.installUpdate();
 api.onUpdateChanged(setUpdate);
 api.getUpdate().then(setUpdate).catch(() => {});
 
+// ---------- Monitor ----------
+const HIST = 60;
+const history = new Map();
+function pushHist(key, v) {
+  if (!history.has(key)) history.set(key, []);
+  const a = history.get(key);
+  a.push(v == null ? 0 : v);
+  if (a.length > HIST) a.shift();
+  return a;
+}
+function spark(values, color, max) {
+  const top = max || Math.max(1, ...values);
+  const pts = values.map((v, i) => `${((i / (HIST - 1)) * 200).toFixed(1)},${(48 - (Math.min(v, top) / top) * 46).toFixed(1)}`).join(" ");
+  return svg(`<svg class="mon-spark" viewBox="0 0 200 50" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`);
+}
+const fmt = {
+  pct: (v) => (v == null ? "—" : nf0.format(v)),
+  temp: (v) => (v == null ? "—" : nf0.format(v) + " °C"),
+  ghz: (v) => (v == null || v === 0 ? "—" : nf1.format(v / 1000) + " ГГц"),
+  mhz: (v) => (v == null || v === 0 ? "—" : nf0.format(v) + " МГц"),
+  w: (v) => (v == null || v === 0 ? "—" : nf0.format(v) + " Вт"),
+  gb: (v) => (v == null ? "—" : nf1.format(v) + " ГБ"),
+  mbs: (v) => (v == null ? "—" : nf1.format(v / 1048576) + " МБ/с"),
+  mbit: (v) => (v == null ? "—" : nf1.format((v * 8) / 1e6) + " Мбит/с"),
+};
+
+function monTile(t) {
+  const hist = pushHist(t.key, t.raw);
+  return h(
+    "div",
+    { class: "tile mon-tile" },
+    h("div", { class: "mon-top" }, h("span", { class: "cap" }, t.cap), h("span", { class: "mono", title: t.model || "" }, t.model || "")),
+    h("div", { class: "mon-val" }, h("span", { class: "big mono" }, t.value), h("span", { class: "unit" }, t.unit)),
+    spark(hist, t.color, t.max),
+    h(
+      "div",
+      { class: "mon-stats" },
+      ...t.stats.map((s) => h("div", { class: "mon-stat" }, h("span", { class: "cap" }, s.k), h("span", { class: "mono" + (s.hot ? " is-hot" : "") }, s.v)))
+    )
+  );
+}
+
+function renderMonitor(x) {
+  const tiles = [];
+  if (x.cpu)
+    tiles.push({
+      key: "cpu", cap: "Процессор", model: x.cpu.name, value: fmt.pct(x.cpu.load), unit: "%", raw: x.cpu.load, max: 100, color: "var(--accent)",
+      stats: [{ k: "темп.", v: fmt.temp(x.cpu.temp), hot: x.cpu.temp >= 80 }, { k: "частота", v: fmt.ghz(x.cpu.clock) }, { k: "питание", v: fmt.w(x.cpu.power) }],
+    });
+  if (x.gpu)
+    tiles.push({
+      key: "gpu", cap: "Видеокарта", model: x.gpu.name.replace(/^NVIDIA GeForce |^AMD Radeon /, ""), value: fmt.pct(x.gpu.load), unit: "%", raw: x.gpu.load, max: 100, color: "var(--c-programs)",
+      stats: [
+        { k: "темп.", v: fmt.temp(x.gpu.temp), hot: x.gpu.temp >= 80 },
+        { k: "частота", v: fmt.mhz(x.gpu.clock) },
+        { k: "видеопамять", v: x.gpu.memUsed != null ? `${nf1.format(x.gpu.memUsed / 1024)} / ${nf0.format((x.gpu.memTotal || 0) / 1024)} ГБ` : "—" },
+      ],
+    });
+  if (x.ram && x.ram.used != null)
+    tiles.push({
+      key: "ram", cap: "Оперативная память", model: x.ram.total ? nf0.format(Math.round(x.ram.total)) + " ГБ" : "", value: fmt.pct(x.ram.load), unit: "%", raw: x.ram.load, max: 100, color: "var(--c-appdata)",
+      stats: [{ k: "занято", v: fmt.gb(x.ram.used) }, { k: "свободно", v: fmt.gb(x.ram.total - x.ram.used) }],
+    });
+  x.disks.forEach((d, i) =>
+    tiles.push({
+      key: "disk" + i, cap: "Диск", model: d.name, value: fmt.pct(d.activity), unit: "%", raw: d.activity, max: 100, color: "var(--c-temp)",
+      stats: [{ k: "чтение", v: fmt.mbs(d.read) }, { k: "запись", v: fmt.mbs(d.write) }, { k: "темп.", v: fmt.temp(d.temp), hot: d.temp >= 60 }],
+    })
+  );
+  if (x.net && x.net.name)
+    tiles.push({
+      key: "net", cap: "Сеть", model: x.net.name, value: nf1.format((x.net.down * 8) / 1e6), unit: "Мбит/с", raw: x.net.down, color: "var(--c-user)",
+      stats: [{ k: "приём", v: fmt.mbit(x.net.down) }, { k: "отдача", v: fmt.mbit(x.net.up) }],
+    });
+  $("mon-grid").replaceChildren(...tiles.map(monTile));
+  $("pawnio-banner").hidden = Boolean(x.pawnio) || !x.admin;
+  $("mon-meta").textContent = x.admin ? "обновление 1 с" : "без прав администратора: часть датчиков недоступна";
+}
+
+$("btn-pawnio").onclick = async () => {
+  const ok = await confirmModal({
+    title: "Установить PawnIO?",
+    text: "PawnIO — подписанный драйвер для доступа к датчикам платы (его же используют LibreHardwareMonitor и FanControl). Установка через winget, Windows попросит подтверждение.",
+    ok: "Установить",
+    danger: false,
+  });
+  if (!ok) return;
+  toast("Устанавливаю PawnIO…");
+  const r = await api.installPawnio();
+  toast(r.ok ? "PawnIO установлен" : r.error || "Установка не завершена");
+};
+
+// ---------- Fan Speed ----------
+const DEFAULT_CURVE = [[30, 25], [50, 35], [65, 55], [75, 75], [85, 100]];
+const fanUi = { selected: null, draft: null, drag: -1, saved: {} };
+
+function fanCfg(id) {
+  return fanUi.saved[id] || { mode: "auto", pct: 50, sensor: null, curve: DEFAULT_CURVE };
+}
+function modeText(c) {
+  if (c.mode === "manual") return `вручную · ${c.pct} %`;
+  if (c.mode === "curve") return "кривая";
+  return "авто";
+}
+function fanName(f) {
+  return f.hardware && /GPU|GeForce|Radeon/i.test(f.hardware) ? f.hardware.replace(/^NVIDIA GeForce |^AMD Radeon /, "") + " · " + f.name : f.name;
+}
+
+function renderFans(x) {
+  const list = $("fan-list");
+  if (!x.fans.length) {
+    list.replaceChildren(h("div", { class: "empty" }, x.pawnio ? "Управляемых вентиляторов не найдено" : "Вентиляторы платы видны после установки PawnIO"));
+    $("fan-editor").hidden = true;
+    return;
+  }
+  if (!fanUi.selected || !x.fans.some((f) => f.id === fanUi.selected)) selectFan(x.fans[0].id, x);
+  list.replaceChildren(
+    ...x.fans.map((f) =>
+      h(
+        "button",
+        { type: "button", class: "fan-item" + (f.id === fanUi.selected ? " is-active" : ""), onclick: () => selectFan(f.id, x) },
+        h("span", {}, h("b", {}, fanName(f)), h("small", {}, modeText(fanCfg(f.id)))),
+        h("span", { class: "mono" }, f.rpm != null ? nf0.format(f.rpm) : "—")
+      )
+    )
+  );
+  const f = x.fans.find((v) => v.id === fanUi.selected);
+  const src = x.temps.find((t) => t.id === fanUi.draft.sensor);
+  $("fan-sub").textContent = `${f.rpm != null ? nf0.format(f.rpm) + " об/мин" : "—"} · ${f.pct != null ? nf0.format(f.pct) + " %" : "—"}${src ? " · " + src.name + " " + nf0.format(src.value) + " °C" : ""}${x.panic ? " · перегрев: 100 %" : ""}`;
+  if (fanUi.draft.mode === "curve" && fanUi.drag < 0) drawCurve();
+}
+
+function selectFan(id, x) {
+  fanUi.selected = id;
+  const c = fanCfg(id);
+  const temps = (x || state.hw)?.temps || [];
+  const cpuTemp = temps.find((t) => /Tctl|Tdie|CPU Package/i.test(t.name));
+  const gpuTemp = temps.find((t) => /GPU Core/i.test(t.name));
+  const isGpu = /gpu/i.test(id);
+  fanUi.draft = { mode: c.mode, pct: c.pct, sensor: c.sensor || (isGpu ? gpuTemp : cpuTemp || gpuTemp)?.id || null, curve: (c.curve || DEFAULT_CURVE).map((p) => p.slice()) };
+  const f = (x || state.hw).fans.find((v) => v.id === id);
+  $("fan-title").textContent = fanName(f);
+  $("fan-editor").hidden = false;
+  renderFanMode();
+}
+
+function renderFanMode() {
+  const d = fanUi.draft;
+  document.querySelectorAll("#fan-mode .seg-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.mode === d.mode));
+  $("fan-manual").hidden = d.mode !== "manual";
+  $("curve-wrap").hidden = d.mode !== "curve";
+  $("fan-auto").hidden = d.mode !== "auto";
+  $("fan-src").hidden = $("fan-src-cap").hidden = d.mode !== "curve";
+  $("fan-slider").value = d.pct;
+  $("fan-pct").textContent = d.pct + " %";
+  if (d.mode === "curve") {
+    drawCurve();
+    renderSensorDd();
+  }
+}
+document.querySelectorAll("#fan-mode .seg-btn").forEach((b) =>
+  b.addEventListener("click", () => {
+    fanUi.draft.mode = b.dataset.mode;
+    renderFanMode();
+  })
+);
+$("fan-slider").oninput = (e) => {
+  fanUi.draft.pct = Number(e.target.value);
+  $("fan-pct").textContent = fanUi.draft.pct + " %";
+};
+$("fan-apply").onclick = async () => {
+  const cfg = { ...fanUi.draft, curve: fanUi.draft.curve.map((p) => [Math.round(p[0]), Math.round(p[1])]) };
+  await api.setFan(fanUi.selected, cfg);
+  if (cfg.mode === "auto") delete fanUi.saved[fanUi.selected];
+  else fanUi.saved[fanUi.selected] = cfg;
+  toast(cfg.mode === "auto" ? "Управление возвращено BIOS" : "Применено");
+  if (state.hw) renderFans(state.hw);
+};
+
+// кривая: x — температура 20…100 °C, y — скорость 0…100 %
+const CW = 640, CH = 360;
+const tx = (t) => ((t - 20) / 80) * CW;
+const py = (p) => CH - (p / 100) * CH;
+function drawCurve() {
+  const el = $("curve");
+  const c = fanUi.draft.curve;
+  const src = state.hw?.temps.find((t) => t.id === fanUi.draft.sensor);
+  let s = "";
+  for (let i = 1; i < 4; i++) s += `<path d="M0 ${(CH / 4) * i}H${CW}" stroke="rgba(255,255,255,.05)"/>`;
+  for (let i = 1; i < 8; i++) s += `<path d="M${(CW / 8) * i} 0V${CH}" stroke="rgba(255,255,255,.05)"/>`;
+  s += `<path d="M0 ${py(20)}H${CW}" stroke="rgba(255,107,107,.25)" stroke-dasharray="3 5"/>`;
+  if (src) s += `<path d="M${tx(src.value)} 0V${CH}" stroke="#c4a574" stroke-dasharray="4 4"/>`;
+  const pts = [[20, c[0][1]], ...c, [100, c[c.length - 1][1]]].map((p) => `${tx(p[0])},${py(p[1])}`).join(" ");
+  s += `<polyline points="${pts}" fill="none" stroke="#67d4f0" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  c.forEach((p, i) => (s += `<circle class="curve-pt" data-i="${i}" cx="${tx(p[0])}" cy="${py(p[1])}" r="8" fill="${fanUi.drag === i ? "#67d4f0" : "#0f0f0f"}" stroke="#67d4f0" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`));
+  el.innerHTML = s;
+}
+(() => {
+  const el = $("curve");
+  const toData = (e) => {
+    const r = el.getBoundingClientRect();
+    const t = 20 + ((e.clientX - r.left) / r.width) * 80;
+    const p = 100 - ((e.clientY - r.top) / r.height) * 100;
+    return [t, p];
+  };
+  el.addEventListener("pointerdown", (e) => {
+    const i = Number(e.target.dataset?.i);
+    if (Number.isNaN(i)) return;
+    fanUi.drag = i;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (fanUi.drag < 0) return;
+    const c = fanUi.draft.curve;
+    const i = fanUi.drag;
+    let [t, p] = toData(e);
+    const lo = i > 0 ? c[i - 1][0] + 2 : 20;
+    const hi = i < c.length - 1 ? c[i + 1][0] - 2 : 100;
+    t = Math.max(lo, Math.min(hi, t));
+    p = Math.max(20, Math.min(100, p));
+    c[i] = [t, p];
+    drawCurve();
+    const tip = $("curve-tip");
+    tip.hidden = false;
+    tip.textContent = `${Math.round(t)} °C → ${Math.round(p)} %`;
+    const r = el.getBoundingClientRect();
+    tip.style.left = e.clientX - r.left + "px";
+    tip.style.top = e.clientY - r.top + "px";
+  });
+  const end = () => {
+    fanUi.drag = -1;
+    $("curve-tip").hidden = true;
+    drawCurve();
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+})();
+
+function renderSensorDd() {
+  const dd = $("fan-src");
+  const temps = state.hw?.temps || [];
+  const cur = temps.find((t) => t.id === fanUi.draft.sensor);
+  const chevron = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5 6 7.5 9 4.5"/></svg>';
+  const btn = h("button", { type: "button", class: "dd-btn", "aria-haspopup": "listbox" }, h("span", {}, cur ? cur.name : "самый горячий CPU/GPU"), svg(chevron));
+  const pop = h(
+    "div",
+    { class: "dd-pop", role: "listbox", hidden: true },
+    ...temps.map((t) =>
+      h(
+        "button",
+        { type: "button", class: "dd-opt" + (t.id === fanUi.draft.sensor ? " is-active" : ""), role: "option", onclick: () => ((fanUi.draft.sensor = t.id), renderSensorDd(), drawCurve()) },
+        h("span", {}, t.name),
+        h("span", { class: "mono" }, nf0.format(t.value) + " °C")
+      )
+    )
+  );
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    pop.hidden = !pop.hidden;
+  };
+  document.addEventListener("click", () => (pop.hidden = true), { once: true });
+  dd.replaceChildren(btn, pop);
+}
+
+// ---------- Overlay ----------
+const METRICS = [
+  ["fps", "FPS"], ["frametime", "Время кадра"], ["low1", "1% low"], ["graph", "График кадров"],
+  ["gpuLoad", "GPU %"], ["gpuTemp", "GPU °C"], ["gpuClock", "GPU МГц"], ["gpuPower", "GPU Вт"], ["vram", "VRAM"],
+  ["cpuLoad", "CPU %"], ["cpuTemp", "CPU °C"], ["cpuClock", "CPU МГц"], ["ram", "RAM"], ["time", "Время"],
+];
+const STYLE_PREVIEWS = [
+  ["1 · строка", () => h("div", { class: "ovl-prev" }, h("span", { class: "a" }, "144"), " FPS · 6,9 ms · GPU 96% 66°")],
+  ["2 · таблица", () => h("div", { class: "ovl-prev pbox" }, h("div", {}, h("span", { class: "d" }, "GPU "), "96% 66°"), h("div", {}, h("span", { class: "d" }, "CPU "), "38% 61°"), h("div", {}, h("span", { class: "d" }, "FPS "), h("span", { class: "a" }, "144"), " 6,9"))],
+  ["3 · пилюли", () => h("div", { class: "ovl-prev", style: "display:flex;gap:4px;flex-wrap:wrap" }, h("span", { style: "background:rgba(10,10,12,.7);padding:2px 6px;border-radius:99px" }, h("span", { class: "a" }, "144 FPS")), h("span", { style: "background:rgba(10,10,12,.7);padding:2px 6px;border-radius:99px" }, "GPU 96%"))],
+  ["4 · график", () => h("div", { class: "ovl-prev pbox" }, h("div", {}, h("span", { class: "a" }, "144 FPS"), " 6,9 ms"), svg('<svg width="90" height="18" viewBox="0 0 90 18"><polyline points="0,10 10,9 20,11 30,8 40,10 50,3 60,10 70,9 80,14 90,9" fill="none" stroke="#67d4f0" stroke-width="1.3"/></svg>'))],
+  ["5 · только FPS", () => h("div", { class: "ovl-prev" }, h("div", { class: "a", style: "font-size:22px;font-weight:700;line-height:1" }, "144"), h("div", {}, "6,9 ms"))],
+];
+
+function renderOverlay() {
+  const o = state.overlay;
+  if (!o) return;
+  $("ovl-enabled").setAttribute("aria-checked", String(o.enabled));
+  $("nav-overlay-badge").hidden = !o.enabled;
+  $("ovl-styles").replaceChildren(
+    ...STYLE_PREVIEWS.map(([label, make], i) =>
+      h("button", { type: "button", class: "ovl-style" + (o.style === i + 1 ? " is-active" : ""), "aria-pressed": String(o.style === i + 1), onclick: () => setOverlay({ style: i + 1 }) }, make(), h("span", { class: "lbl" }, label))
+    )
+  );
+  $("ovl-metrics").replaceChildren(
+    ...METRICS.map(([k, label]) => h("button", { type: "button", class: "chip-t", "aria-pressed": String(Boolean(o.metrics[k])), onclick: () => setOverlay({ metrics: { [k]: !o.metrics[k] } }) }, label))
+  );
+  $("ovl-corner").replaceChildren(
+    ...[["tl", "Слева сверху"], ["tr", "Справа сверху"], ["bl", "Слева снизу"], ["br", "Справа снизу"]].map(([c, label]) =>
+      h("button", { type: "button", class: "corner" + (o.corner === c ? " is-active" : ""), "data-c": c, "aria-label": label, title: label, onclick: () => setOverlay({ corner: c }) })
+    )
+  );
+  $("ovl-scale").value = o.scale;
+  $("ovl-scale-v").textContent = o.scale + " %";
+  $("ovl-bg").value = o.bg;
+  $("ovl-bg-v").textContent = o.bg + " %";
+  $("ovl-only").checked = o.onlyGames;
+  $("ovl-hotkey").value = o.hotkey || "нет";
+}
+async function setOverlay(patch) {
+  state.overlay = await api.setOverlay(patch);
+  renderOverlay();
+}
+$("ovl-enabled").onclick = () => setOverlay({ enabled: !state.overlay.enabled });
+$("ovl-scale").oninput = (e) => setOverlay({ scale: Number(e.target.value) });
+$("ovl-bg").oninput = (e) => setOverlay({ bg: Number(e.target.value) });
+$("ovl-only").onchange = (e) => setOverlay({ onlyGames: e.target.checked });
+$("ovl-hotkey").addEventListener("keydown", (e) => {
+  e.preventDefault();
+  if (e.key === "Backspace" || e.key === "Delete") return setOverlay({ hotkey: "" });
+  if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+  const parts = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.shiftKey) parts.push("Shift");
+  if (e.altKey) parts.push("Alt");
+  const key = e.code.startsWith("Key") ? e.code.slice(3) : e.code.startsWith("Digit") ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+  parts.push(key);
+  setOverlay({ hotkey: parts.join("+") });
+  e.target.blur();
+});
+api.onOverlaySettings((o) => ((state.overlay = o), renderOverlay()));
+api.onFps((f) => {
+  $("ov-fps-meta").textContent = f.fps != null ? `${f.app || "игра"} · ${f.fps} FPS` : f.error || "игра не найдена";
+});
+
+// ---------- поток датчиков ----------
+api.onHwSample((x) => {
+  state.hw = x;
+  renderMonitor(x); // и в фоне: история графиков копится с запуска
+  if (document.querySelector("#page-fans.is-active") || !fanUi.selected) renderFans(x);
+});
+(async () => {
+  const s = await api.hwState();
+  fanUi.saved = s.fans || {};
+  state.overlay = s.overlay;
+  renderOverlay();
+  if (s.sample) {
+    state.hw = s.sample;
+    renderMonitor(s.sample);
+    renderFans(s.sample);
+  }
+})();
+
 // ---------- старт ----------
 (async () => {
   state.info = await api.info();

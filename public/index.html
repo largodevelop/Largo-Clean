@@ -60,6 +60,20 @@
         <span class="nav-badge mono" id="nav-apps-badge" hidden></span>
       </button>
 
+      <button type="button" class="nav-item" data-page="monitor">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M1.5 8.5h3l1.5-4 3 8 1.5-4h4" /></svg>
+        <span>Monitor</span>
+      </button>
+      <button type="button" class="nav-item" data-page="fans">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 1 1 0 12.4a6.2 6.2 0 1 1 0-12.4Z" /><path d="M8 8C7.2 5.6 7.6 2.8 9.8 2.6c1.8-.1 2 2.8-1.8 5.4Z" /><path d="M8 8C7.2 5.6 7.6 2.8 9.8 2.6c1.8-.1 2 2.8-1.8 5.4Z" transform="rotate(120 8 8)" /><path d="M8 8C7.2 5.6 7.6 2.8 9.8 2.6c1.8-.1 2 2.8-1.8 5.4Z" transform="rotate(240 8 8)" /></svg>
+        <span>Fan Speed</span>
+      </button>
+      <button type="button" class="nav-item" data-page="overlay">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h10c.6 0 1 .4 1 1v8c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1V4c0-.6.4-1 1-1Z" /><path d="M4 5h4v2.5H4Z" /></svg>
+        <span>Overlay</span>
+        <span class="nav-badge mono" id="nav-overlay-badge" hidden>вкл</span>
+      </button>
+
       <div class="rail-spacer"></div>
       <div class="rail-drives" id="rail-drives"></div>
     </nav>
@@ -193,6 +207,88 @@
           <span>Показывать системные компоненты (драйверы, SDK, библиотеки)</span>
         </label>
         <p class="footnote" id="apps-footnote">Дата последнего запуска берётся из Steam, журнала активности Windows (BAM) и времени последнего доступа к exe-файлу программы. Удаление запускает штатный деинсталлятор программы, а для игр Steam открывает удаление в Steam.</p>
+      </section>
+      <!-- MONITOR -->
+      <section class="page" id="page-monitor">
+        <div class="page-head">
+          <h1>Monitor</h1>
+          <span class="mono sub-mono" id="mon-meta"></span>
+        </div>
+        <div class="banner banner-warn" id="pawnio-banner" hidden>
+          <span>Без драйвера PawnIO нет температуры процессора и вентиляторов платы.</span>
+          <button type="button" class="btn btn-soft" id="btn-pawnio">Установить PawnIO</button>
+        </div>
+        <div class="mon-grid" id="mon-grid"><div class="empty">Запускаю датчики…</div></div>
+      </section>
+
+      <!-- FAN SPEED -->
+      <section class="page" id="page-fans">
+        <div class="fans-layout">
+          <div class="fans-list">
+            <h1>Fan Speed</h1>
+            <div id="fan-list"><div class="empty">Ищу вентиляторы…</div></div>
+            <div class="fan-ext mono" id="fan-ext"></div>
+          </div>
+          <div class="tile fan-editor" id="fan-editor" hidden>
+            <div class="fan-head">
+              <div>
+                <h2 id="fan-title"></h2>
+                <div class="mono sub-mono" id="fan-sub"></div>
+              </div>
+              <div class="seg" id="fan-mode" role="tablist" aria-label="Режим">
+                <button type="button" class="seg-btn" data-mode="auto">Авто</button>
+                <button type="button" class="seg-btn" data-mode="manual">Вручную</button>
+                <button type="button" class="seg-btn" data-mode="curve">Кривая</button>
+              </div>
+            </div>
+            <div class="fan-manual" id="fan-manual" hidden>
+              <span class="mono fan-pct" id="fan-pct">50 %</span>
+              <input type="range" id="fan-slider" min="20" max="100" step="1" aria-label="Скорость, %" />
+            </div>
+            <div class="curve-wrap" id="curve-wrap" hidden>
+              <svg id="curve" viewBox="0 0 640 360" preserveAspectRatio="none" aria-label="Кривая: температура → скорость"></svg>
+              <span class="mono curve-ax" style="left:10px;top:8px">100 %</span>
+              <span class="mono curve-ax" style="left:10px;bottom:8px">20 °C</span>
+              <span class="mono curve-ax" style="right:10px;bottom:8px">100 °C</span>
+              <span class="mono curve-tip" id="curve-tip" hidden></span>
+            </div>
+            <div class="fan-auto mono" id="fan-auto" hidden>Скоростью управляет BIOS / драйвер видеокарты.</div>
+            <div class="fan-foot">
+              <span class="cap" id="fan-src-cap">датчик</span>
+              <div class="dd" id="fan-src"></div>
+              <button type="button" class="btn btn-accent" id="fan-apply">Применить</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OVERLAY -->
+      <section class="page" id="page-overlay">
+        <div class="page-head">
+          <h1>Overlay</h1>
+          <div class="head-actions">
+            <span class="mono sub-mono" id="ov-fps-meta"></span>
+            <button type="button" class="switch" id="ovl-enabled" role="switch" aria-checked="false" aria-label="Оверлей"><i></i></button>
+          </div>
+        </div>
+        <div class="tile ovl-block">
+          <span class="cap">Стиль</span>
+          <div class="ovl-styles" id="ovl-styles"></div>
+        </div>
+        <div class="ovl-cols">
+          <div class="tile ovl-block">
+            <span class="cap">Показатели</span>
+            <div class="chips" id="ovl-metrics"></div>
+          </div>
+          <div class="tile ovl-block">
+            <span class="cap">Положение</span>
+            <div class="corners" id="ovl-corner"></div>
+            <label class="range-line"><span>Размер</span><input type="range" id="ovl-scale" min="80" max="200" step="10" /><span class="mono" id="ovl-scale-v"></span></label>
+            <label class="range-line"><span>Фон</span><input type="range" id="ovl-bg" min="0" max="100" step="5" /><span class="mono" id="ovl-bg-v"></span></label>
+            <label class="check-line"><input type="checkbox" id="ovl-only" /><span>Только в играх</span></label>
+            <label class="range-line"><span>Клавиша</span><input type="text" class="hotkey-input mono" id="ovl-hotkey" readonly /></label>
+          </div>
+        </div>
       </section>
     </main>
   </div>

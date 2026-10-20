@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, BrowserWindow, ipcMain, shell, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, nativeImage, Tray, Menu } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { execFile } = require("child_process");
@@ -9,9 +9,13 @@ const { scanDrive } = require("./scanner");
 const cleaner = require("./cleaner");
 const apps = require("./apps");
 const updater = require("./updater");
+const { setupHardware } = require("./hardware");
 
 let mainWindow = null;
 let currentScan = null;
+let hardware = null;
+let tray = null;
+let quitting = false;
 let appCache = new Map();
 
 const publicDir = path.join(__dirname, "..", "public");
@@ -70,9 +74,45 @@ function createWindow() {
   if (process.env.LARGO_SHOT) captureForReview(process.env.LARGO_SHOT);
   mainWindow.on("maximize", () => send("window:state", { maximized: true }));
   mainWindow.on("unmaximize", () => send("window:state", { maximized: false }));
+  // закрытие — в трей: вентиляторы по кривой и оверлей работают, пока приложение запущено
+  mainWindow.on("close", (e) => {
+    if (quitting || process.env.LARGO_SHOT) return;
+    e.preventDefault();
+    mainWindow.hide();
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+function showMain() {
+  if (!mainWindow) return createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function updateTray() {
+  if (!tray) return;
+  const on = hardware && hardware.overlay().enabled;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Largo Clean", enabled: false },
+      { type: "separator" },
+      { label: "Открыть", click: showMain },
+      { label: on ? "Оверлей: выключить" : "Оверлей: включить", click: () => (hardware.toggleOverlay(), updateTray()) },
+      { type: "separator" },
+      { label: "Выход", click: () => app.quit() },
+    ])
+  );
+}
+
+function createTray() {
+  const img = nativeImage.createFromPath(path.join(publicDir, "icon.png")).resize({ width: 16, height: 16 });
+  tray = new Tray(img);
+  tray.setToolTip("Largo Clean");
+  tray.on("double-click", showMain);
+  updateTray();
 }
 
 // Отладка: LARGO_SHOT=<папка> снимает скриншоты всех разделов и закрывает приложение.
@@ -95,6 +135,20 @@ async function captureForReview(dir) {
   await shot("overview", "overview");
   await shot("clean", "clean");
   await shot("apps", "apps");
+  await wait(1500);
+  await shot("monitor", "monitor");
+  await shot("fans", "fans");
+  await shot("overlay", "overlay");
+  // само окно оверлея во всех стилях; настройки после съёмки возвращаются как были
+  const before = await js("JSON.stringify(state.overlay)");
+  for (let st = 1; st <= 5; st++) {
+    await js(`setOverlay({ enabled: true, onlyGames: false, style: ${st}, metrics: { low1: true, gpuClock: true, vram: true } })`);
+    await wait(2500);
+    const ov = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "Largo Overlay");
+    if (ov && ov.isVisible()) fs.writeFileSync(path.join(dir, `ovl-${st}.png`), (await ov.webContents.capturePage()).toPNG());
+  }
+  await js(`setOverlay(${before})`);
+  await wait(500);
   app.quit();
 }
 
@@ -285,23 +339,28 @@ ipcMain.handle("shell:reveal", (_e, p) => shell.showItemInFolder(p));
 ipcMain.handle("shell:open", (_e, p) => shell.openPath(p));
 ipcMain.handle("window:minimize", () => mainWindow?.minimize());
 ipcMain.handle("window:maximize", () => (mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize()));
-ipcMain.handle("window:close", () => app.quit());
+ipcMain.handle("window:close", () => mainWindow?.hide());
+ipcMain.handle("app:quit", () => app.quit());
 
 if (!process.env.LARGO_SHOT && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  });
+  app.on("second-instance", showMain);
   app.whenReady().then(() => {
     createWindow();
+    hardware = setupHardware({ app, getMainWindow: () => mainWindow });
+    ipcMain.on("overlay:changed", updateTray);
+    if (!process.env.LARGO_SHOT) createTray();
     setTimeout(() => checkUpdates(), 5000);
     setInterval(() => checkUpdates(), 30 * 60 * 1000);
   });
-  app.on("window-all-closed", () => {
+  app.on("before-quit", () => {
+    quitting = true;
     if (currentScan) currentScan.cancel();
-    app.quit();
+    if (hardware) hardware.stop();
+    if (tray) tray.destroy();
+  });
+  app.on("window-all-closed", () => {
+    if (process.env.LARGO_SHOT) app.quit();
   });
 }
