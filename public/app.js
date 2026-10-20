@@ -984,6 +984,11 @@ function updatePreviews() {
     const style = Number(card.dataset.style);
     const box = card.querySelector(".lo");
     box.replaceChildren(...window.LargoOverlay.build({ settings: { ...o, style }, hw: state.hw, fps: previewFps() }));
+    // ужать превью, чтобы оно целиком влезло в карточку
+    const live = box.parentElement;
+    box.style.transform = "none";
+    const k = Math.min(0.62, live.clientWidth / Math.max(1, box.offsetWidth), live.clientHeight / Math.max(1, box.offsetHeight));
+    box.style.transform = `scale(${k.toFixed(3)})`;
   });
 }
 

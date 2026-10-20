@@ -465,8 +465,9 @@ button:focus-visible, input:focus-visible, .clean-row:focus-visible { outline: 2
 .hotkey-input:focus { outline: 1.5px solid var(--accent); }
 
 /* превью стилей оверлея: живая отрисовка, ужатая под карточку */
-.ovl-style { min-height: 150px; overflow: hidden; }
-.ovl-live { flex: 1; min-height: 0; overflow: hidden; }
-.ovl-live .lo { display: inline-block; transform: scale(0.62); transform-origin: top left; }
+.ovl-style { height: 150px; min-height: 0; overflow: hidden; }
+.ovl-style { min-width: 0; }
+.ovl-live { position: relative; flex: 1; width: 100%; min-height: 0; min-width: 0; overflow: hidden; }
+.ovl-live .lo { position: absolute; left: 0; top: 0; width: max-content; transform-origin: top left; }
 .ovl-live .lo-line { white-space: normal; width: 220px; }
-.ovl-live .lo-pills { width: 230px; }
+.ovl-live .lo-pills { max-width: 300px; }

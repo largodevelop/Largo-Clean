@@ -142,7 +142,7 @@ async function captureForReview(dir) {
   // само окно оверлея во всех стилях; настройки после съёмки возвращаются как были
   const before = await js("JSON.stringify(state.overlay)");
   for (let st = 1; st <= 5; st++) {
-    await js(`setOverlay({ enabled: true, onlyGames: false, style: ${st}, metrics: { low1: true, gpuClock: true, vram: true } })`);
+    await js(`setOverlay({ enabled: true, onlyGames: false, style: ${st} })`);
     await wait(2500);
     const ov = BrowserWindow.getAllWindows().find((w) => w.getTitle() === "Largo Overlay");
     if (ov && ov.isVisible()) fs.writeFileSync(path.join(dir, `ovl-${st}.png`), (await ov.webContents.capturePage()).toPNG());
