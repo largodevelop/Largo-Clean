@@ -793,7 +793,13 @@ function modeText(c) {
   return "авто";
 }
 function fanName(f) {
-  return f.hardware && /GPU|GeForce|Radeon/i.test(f.hardware) ? f.hardware.replace(/^NVIDIA GeForce |^AMD Radeon /, "") + " · " + f.name : f.name;
+  if (f.hardware && /GPU|GeForce|Radeon/i.test(f.hardware)) return "Видеокарта " + f.hardware.replace(/^NVIDIA GeForce |^AMD Radeon /, "");
+  return f.name
+    .replace(/^CPU Fan/i, "Процессор")
+    .replace(/^CPU Optional Fan/i, "Процессор, доп.")
+    .replace(/^Pump Fan/i, "Помпа")
+    .replace(/^System Fan/i, "Корпус")
+    .replace(/^Fan/i, "Вентилятор");
 }
 
 function renderFans(x) {
