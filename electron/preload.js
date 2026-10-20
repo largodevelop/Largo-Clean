@@ -6,6 +6,10 @@ const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, data) => cb(data));
 
 contextBridge.exposeInMainWorld("largo", {
   info: () => ipcRenderer.invoke("sys:info"),
+  drives: () => ipcRenderer.invoke("sys:drives"),
+  getUpdate: () => ipcRenderer.invoke("update:status"),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
+  onUpdateChanged: on("update:changed"),
   relaunchAdmin: () => ipcRenderer.invoke("sys:relaunchAdmin"),
   hibernateOff: () => ipcRenderer.invoke("sys:hibernateOff"),
 

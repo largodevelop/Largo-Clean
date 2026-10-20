@@ -8,6 +8,7 @@ const { runPs, runPsJson } = require("./ps");
 const { scanDrive } = require("./scanner");
 const cleaner = require("./cleaner");
 const apps = require("./apps");
+const updater = require("./updater");
 
 let mainWindow = null;
 let currentScan = null;
@@ -96,7 +97,50 @@ async function captureForReview(dir) {
   app.quit();
 }
 
+// ---- автообновление из релизов GitHub (как в Largo Accept) ----
+let updateInfo = null;
+let updating = false;
+
+function broadcastUpdate(extra = {}) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (typeof extra.progress === "number") mainWindow.setProgressBar(extra.progress);
+    else if (!updating || extra.error) mainWindow.setProgressBar(-1);
+  }
+  send("update:changed", { available: Boolean(updateInfo), latest: updateInfo?.latest || "", updating, ...extra });
+}
+
+async function checkUpdates() {
+  if (!app.isPackaged && !process.env.LARGO_UPDATE_API) return;
+  if (updating) return;
+  const info = await updater.checkForUpdate(app.getVersion());
+  updateInfo = info.available ? info : null;
+  broadcastUpdate();
+}
+
+async function installUpdate() {
+  if (!updateInfo || updating) return { ok: false };
+  updating = true;
+  broadcastUpdate({ progress: 0 });
+  try {
+    const zip = await updater.download(updateInfo, (progress) => broadcastUpdate({ progress }));
+    broadcastUpdate({ progress: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const exe = process.execPath;
+    updater.applyAndRestart(zip, path.dirname(exe), exe, process.pid);
+    app.quit();
+    return { ok: true };
+  } catch (error) {
+    updating = false;
+    broadcastUpdate({ error: String((error && error.message) || error) });
+    return { ok: false, error: String((error && error.message) || error) };
+  }
+}
+
+ipcMain.handle("update:status", () => ({ available: Boolean(updateInfo), latest: updateInfo?.latest || "", updating }));
+ipcMain.handle("update:install", () => installUpdate());
+
 // ---- система ----
+ipcMain.handle("sys:drives", () => drives());
 ipcMain.handle("sys:info", async () => {
   const [admin, list, hib] = await Promise.all([isAdmin(), drives(), hibernation()]);
   return { admin, drives: list, hibernation: hib, version: app.getVersion() };
@@ -250,7 +294,11 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   });
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    createWindow();
+    setTimeout(() => checkUpdates(), 5000);
+    setInterval(() => checkUpdates(), 30 * 60 * 1000);
+  });
   app.on("window-all-closed", () => {
     if (currentScan) currentScan.cancel();
     app.quit();

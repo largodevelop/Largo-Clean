@@ -383,7 +383,7 @@ async function startScan() {
   $("tree-rows").replaceChildren(h("div", { class: "empty" }, "Сканирую диск…"));
   $("big-rows").replaceChildren(h("div", { class: "empty" }, "Сканирую диск…"));
   $("tree-crumbs").replaceChildren();
-  renderHero();
+  await refreshDrives();
   const drive = state.drive;
   const r = await api.scan(drive + SEP);
   if (drive !== state.drive) return; // за время скана выбрали другой диск
@@ -394,6 +394,8 @@ async function startScan() {
     if (!r.cancelled) $("tree-rows").replaceChildren(h("div", { class: "empty" }, "Не удалось просканировать: " + (r.error || "")));
     return;
   }
+  state.info.drives = await api.drives(); // место могло измениться за время обхода
+  renderDrives();
   state.scan = r.result;
   indexScan(r.result);
   renderHero();
@@ -410,8 +412,7 @@ api.onScanProgress((p) => {
 });
 
 async function refreshDrives() {
-  const info = await api.info();
-  state.info.drives = info.drives;
+  state.info.drives = await api.drives();
   renderDrives();
   renderHero();
 }
@@ -674,6 +675,25 @@ window.addEventListener("focus", () => {
   lastAppsRefresh = Date.now();
   api.apps().then((r) => ((state.apps = r.apps), renderApps()));
 });
+
+// ---------- обновление ----------
+function setUpdate(st) {
+  if (!st) return;
+  const btn = $("btn-update");
+  btn.hidden = !st.available;
+  const line = $("update-line");
+  const known = typeof st.progress === "number";
+  line.hidden = !st.updating;
+  line.classList.toggle("is-indeterminate", st.updating && !known);
+  $("update-line-fill").style.width = known ? `${Math.round(st.progress * 100)}%` : "";
+  btn.classList.toggle("is-busy", Boolean(st.updating));
+  const pct = known ? ` (${Math.round(st.progress * 100)}%)` : "";
+  btn.title = st.updating ? `Скачиваю ${st.latest}${pct}` : st.available ? `Доступно обновление ${st.latest}: нажмите, чтобы установить` : "";
+  if (st.error) toast("Обновление не удалось: " + st.error);
+}
+$("btn-update").onclick = () => api.installUpdate();
+api.onUpdateChanged(setUpdate);
+api.getUpdate().then(setUpdate).catch(() => {});
 
 // ---------- старт ----------
 (async () => {

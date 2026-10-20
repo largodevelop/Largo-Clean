@@ -19,6 +19,14 @@ npm run build
 
 Готовая папка: `release/win-unpacked/Largo Clean.exe`.
 
+## Обновления
+
+Как в Largo Accept: приложение раз в 30 минут проверяет последний релиз GitHub и, если там новая версия с архивом `LargoClean-win.zip`, показывает значок обновления в заголовке окна. Выпуск: поднять `version` в `package.json`, закоммитить и выполнить
+
+```
+npm run release
+```
+
 ## Как устроено
 
 - `electron/scanner.cs` — обход диска через Win32 `FindFirstFileExW` (файлы не открываются), компилируется на лету через PowerShell `Add-Type`. Там же замер и удаление для очистки.

@@ -14,6 +14,7 @@
   <div class="glow glow-a" aria-hidden="true"></div>
   <div class="glow glow-b" aria-hidden="true"></div>
 
+  <div class="update-line" id="update-line" hidden><i id="update-line-fill"></i></div>
   <header class="titlebar">
     <div class="titlebar-brand">
       <svg class="brand-mark" viewBox="0 0 100 100" width="22" height="22" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
@@ -26,6 +27,9 @@
     <div class="titlebar-right">
       <button type="button" class="chip chip-admin" id="admin-chip" hidden></button>
       <div class="titlebar-controls">
+        <button type="button" class="win-btn win-update" id="btn-update" aria-label="Обновить" title="Доступно обновление" hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M4 7l4-4 4 4" /></svg>
+        </button>
         <button type="button" class="win-btn" id="btn-min" aria-label="Свернуть">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 8h8" /></svg>
         </button>
