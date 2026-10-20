@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("largo", {
   setOverlay: (patch) => ipcRenderer.invoke("overlay:set", patch).then((r) => (ipcRenderer.send("overlay:changed"), r)),
   onOverlaySettings: on("overlay:settings"),
   installPawnio: () => ipcRenderer.invoke("hw:installPawnio"),
+  onPawnio: on("hw:pawnio"),
   quit: () => ipcRenderer.invoke("app:quit"),
 
   reveal: (p) => ipcRenderer.invoke("shell:reveal", p),

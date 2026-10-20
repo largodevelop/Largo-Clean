@@ -1,6 +1,6 @@
 {
   "name": "largo-clean",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Largo Clean — анализ диска, очистка и неиспользуемые приложения",
   "main": "electron/main.js",
   "author": "Largo Develop",

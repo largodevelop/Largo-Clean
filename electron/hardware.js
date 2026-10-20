@@ -214,26 +214,32 @@ function setupHardware({ app, getMainWindow }) {
     if (patch.hotkey !== undefined) registerHotkey();
     return overlay;
   });
+  // Кнопка «Установить PawnIO»: официальный сайт в браузере по умолчанию,
+  // затем ждём появления драйвера и перезапускаем датчики.
+  let pawnioWatch = null;
   ipcMain.handle("hw:installPawnio", async () => {
-    // официальный установщик PawnIO через winget: свои окна, подтверждение UAC
-    const { spawn } = require("child_process");
-    return new Promise((resolve) => {
-      const p = spawn("winget", ["install", "--id", "namazso.PawnIO", "-e", "--accept-package-agreements", "--accept-source-agreements"], { windowsHide: false });
-      p.on("exit", async (code) => {
-        pawnio = await pawnioInstalled();
-        if (pawnio) sensors.stop(), setTimeout(() => sensors.restart(), 2000);
-        resolve({ ok: pawnio, code });
-      });
-      p.on("error", () => {
-        shell.openExternal("https://pawnio.eu/");
-        resolve({ ok: false, error: "winget недоступен — открыт сайт PawnIO" });
-      });
-    });
+    await shell.openExternal("https://pawnio.eu/");
+    clearInterval(pawnioWatch);
+    const until = Date.now() + 30 * 60 * 1000;
+    pawnioWatch = setInterval(async () => {
+      if (Date.now() > until) return clearInterval(pawnioWatch);
+      if (!(await pawnioInstalled())) return;
+      clearInterval(pawnioWatch);
+      pawnio = true;
+      sensors.stop();
+      setTimeout(() => {
+        sensors.restart();
+        for (const [id, cfg] of Object.entries(fanSettings)) sensors.send({ cmd: "fan", id, ...cfg });
+      }, 2000);
+      sendMain("hw:pawnio", true);
+    }, 5000);
+    return { ok: true };
   });
 
   return {
     stop() {
       clearInterval(overlayTimer);
+      clearInterval(pawnioWatch);
       globalShortcut.unregisterAll();
       sensors.stop();
       fps.stop();

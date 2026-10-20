@@ -775,17 +775,10 @@ function renderMonitor(x) {
 }
 
 $("btn-pawnio").onclick = async () => {
-  const ok = await confirmModal({
-    title: "Установить PawnIO?",
-    text: "PawnIO — подписанный драйвер для доступа к датчикам платы (его же используют LibreHardwareMonitor и FanControl). Установка через winget, Windows попросит подтверждение.",
-    ok: "Установить",
-    danger: false,
-  });
-  if (!ok) return;
-  toast("Устанавливаю PawnIO…");
-  const r = await api.installPawnio();
-  toast(r.ok ? "PawnIO установлен" : r.error || "Установка не завершена");
+  await api.installPawnio();
+  toast("Открыт pawnio.eu — после установки драйвера датчики подключатся сами");
 };
+api.onPawnio(() => toast("PawnIO установлен — подключаю датчики платы"));
 
 // ---------- Fan Speed ----------
 const DEFAULT_CURVE = [[30, 25], [50, 35], [65, 55], [75, 75], [85, 100]];
