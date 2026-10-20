@@ -62,6 +62,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: !process.env.LARGO_SHOT,
     },
   });
   mainWindow.loadFile(path.join(publicDir, "index.html"));
@@ -77,23 +78,23 @@ function createWindow() {
 // Отладка: LARGO_SHOT=<папка> снимает скриншоты всех разделов и закрывает приложение.
 async function captureForReview(dir) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const shot = async (name) => fs.writeFileSync(path.join(dir, name + ".png"), (await mainWindow.capturePage()).toPNG());
-  await wait(4000);
-  await shot("0-scanning");
-  await wait(22000);
-  await shot("1-overview");
-  await mainWindow.webContents.executeJavaScript("document.querySelector('.content').scrollTop = 600");
-  await wait(500);
-  await shot("2-overview-bottom");
-  await mainWindow.webContents.executeJavaScript("document.querySelector('.content').scrollTop = 0; document.querySelector('[data-page=clean]').click()");
-  await wait(1500);
-  await shot("3-clean");
-  await mainWindow.webContents.executeJavaScript("document.querySelector('[data-page=apps]').click()");
-  await wait(2500);
-  await shot("4-apps");
-  await mainWindow.webContents.executeJavaScript("document.querySelector('[data-filter=all]').click()");
-  await wait(1500);
-  await shot("5-apps-all");
+  const js = (code) => mainWindow.webContents.executeJavaScript(code);
+  const shot = async (name, page) => {
+    if (page) await js(`go(${JSON.stringify(page)})`);
+    await wait(1200);
+    mainWindow.webContents.invalidate();
+    await wait(300);
+    fs.writeFileSync(path.join(dir, name + ".png"), (await mainWindow.capturePage()).toPNG());
+  };
+  // ждём, пока закончатся скан диска, замер очистки и список приложений
+  for (let i = 0; i < 240; i++) {
+    const ready = await js("Boolean(state.scan) && Object.keys(state.sizes).length > 0 && state.apps.length > 0").catch(() => false);
+    if (ready) break;
+    await wait(500);
+  }
+  await shot("overview", "overview");
+  await shot("clean", "clean");
+  await shot("apps", "apps");
   app.quit();
 }
 
@@ -286,7 +287,7 @@ ipcMain.handle("window:minimize", () => mainWindow?.minimize());
 ipcMain.handle("window:maximize", () => (mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize()));
 ipcMain.handle("window:close", () => app.quit());
 
-if (!app.requestSingleInstanceLock()) {
+if (!process.env.LARGO_SHOT && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on("second-instance", () => {
