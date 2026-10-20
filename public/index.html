@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Largo Clean</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="glow glow-a" aria-hidden="true"></div>
+  <div class="glow glow-b" aria-hidden="true"></div>
+
+  <header class="titlebar">
+    <div class="titlebar-brand">
+      <svg class="brand-mark" viewBox="0 0 100 100" width="22" height="22" fill="none" stroke="currentColor" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+        <path d="M50 6 88 28V72L50 94 12 72V28Z" />
+        <path d="M50 30C52 44 56 48 70 50 56 52 52 56 50 70 48 56 44 52 30 50 44 48 48 44 50 30Z" stroke-width="5.5" />
+      </svg>
+      <span class="titlebar-name">largo clean</span>
+      <span class="titlebar-ver" id="app-ver"></span>
+    </div>
+    <div class="titlebar-right">
+      <button type="button" class="chip chip-admin" id="admin-chip" hidden></button>
+      <div class="titlebar-controls">
+        <button type="button" class="win-btn" id="btn-min" aria-label="Свернуть">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 8h8" /></svg>
+        </button>
+        <button type="button" class="win-btn" id="btn-max" aria-label="Развернуть">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4" y="4" width="8" height="8" rx="1.5" /></svg>
+        </button>
+        <button type="button" class="win-btn win-close" id="btn-close" aria-label="Закрыть">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="rail" aria-label="Разделы">
+      <button type="button" class="nav-item is-active" data-page="overview">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.5" /><path d="M8 2.5V8l4 3.5" stroke-linecap="round" /></svg>
+        <span>Обзор</span>
+      </button>
+      <button type="button" class="nav-item" data-page="clean">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 2c.5 3 1.5 4 4.5 4.5C9.5 7 8.5 8 8 11c-.5-3-1.5-4-4.5-4.5C6.5 6 7.5 5 8 2Z" /><path d="M12.5 10.5c.2 1.2.6 1.6 1.8 1.8-1.2.2-1.6.6-1.8 1.8-.2-1.2-.6-1.6-1.8-1.8 1.2-.2 1.6-.6 1.8-1.8Z" /></svg>
+        <span>Очистка</span>
+        <span class="nav-badge mono" id="nav-clean-badge" hidden></span>
+      </button>
+      <button type="button" class="nav-item" data-page="apps">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1.2" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1.2" /><rect x="9" y="9" width="4.5" height="4.5" rx="1.2" /></svg>
+        <span>Приложения</span>
+        <span class="nav-badge mono" id="nav-apps-badge" hidden></span>
+      </button>
+
+      <div class="rail-spacer"></div>
+      <div class="rail-drives" id="rail-drives"></div>
+    </nav>
+
+    <main class="content">
+      <!-- ОБЗОР -->
+      <section class="page is-active" id="page-overview">
+        <div class="page-head">
+          <div>
+            <h1>Обзор диска</h1>
+          </div>
+          <div class="head-actions">
+            <div class="seg" id="drive-seg" role="tablist" aria-label="Диск"></div>
+            <button type="button" class="btn btn-ghost" id="btn-rescan">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.8h-2.8" /></svg>
+              Пересканировать
+            </button>
+          </div>
+        </div>
+
+        <div class="tile hero">
+          <div class="hero-top">
+            <div class="hero-num">
+              <span class="cap">Занято</span>
+              <span class="big mono" id="ov-used">—</span>
+              <span class="of mono" id="ov-total"></span>
+            </div>
+            <div class="hero-num right">
+              <span class="cap">Свободно</span>
+              <span class="big mono accent" id="ov-free">—</span>
+            </div>
+          </div>
+          <div class="stack" id="ov-stack" aria-hidden="true"></div>
+          <div class="legend" id="ov-legend"></div>
+          <div class="scan-line" id="ov-scan" hidden>
+            <div class="scan-bar"><i id="ov-scan-fill"></i></div>
+            <div class="scan-meta mono"><span id="ov-scan-count"></span><span class="scan-dir" id="ov-scan-dir"></span></div>
+          </div>
+        </div>
+
+        <div class="tips" id="ov-tips">
+          <div class="tile tip" id="tip-clean">
+            <span class="cap">Можно очистить</span>
+            <span class="tip-num mono" id="tip-clean-num">…</span>
+            <span class="tip-text">Временные файлы и кэши, которые программы создадут заново</span>
+            <button type="button" class="btn btn-soft" data-goto="clean">К очистке</button>
+          </div>
+          <div class="tile tip" id="tip-apps">
+            <span class="cap">Давно не запускались</span>
+            <span class="tip-num mono" id="tip-apps-num">…</span>
+            <span class="tip-text" id="tip-apps-text">Программы и игры, которыми вы не пользуетесь</span>
+            <button type="button" class="btn btn-soft" data-goto="apps">Посмотреть</button>
+          </div>
+          <div class="tile tip" id="tip-hib" hidden>
+            <span class="cap">Файл гибернации</span>
+            <span class="tip-num mono" id="tip-hib-num"></span>
+            <span class="tip-text">hiberfil.sys нужен только для гибернации и быстрого запуска</span>
+            <button type="button" class="btn btn-soft" id="btn-hib">Отключить</button>
+          </div>
+        </div>
+
+        <div class="cols">
+          <div class="tile panel">
+            <div class="panel-head">
+              <h2>Что занимает место</h2>
+              <nav class="crumbs mono" id="tree-crumbs" aria-label="Путь"></nav>
+            </div>
+            <div class="rows" id="tree-rows">
+              <div class="empty">Сканирую диск…</div>
+            </div>
+          </div>
+          <div class="tile panel">
+            <div class="panel-head"><h2>Крупные файлы</h2></div>
+            <div class="rows" id="big-rows">
+              <div class="empty">Сканирую диск…</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ОЧИСТКА -->
+      <section class="page" id="page-clean">
+        <div class="page-head">
+          <div>
+            <h1>Очистка</h1>
+            <p class="sub">Удаляются только временные файлы и кэши. Файлы младше суток и занятые программами не трогаются.</p>
+          </div>
+          <div class="head-actions">
+            <div class="sum">
+              <span class="cap">Выбрано</span>
+              <span class="mono sum-num" id="clean-sum">—</span>
+            </div>
+            <button type="button" class="btn btn-accent" id="btn-clean" disabled>Очистить</button>
+          </div>
+        </div>
+        <div class="banner" id="clean-banner" hidden></div>
+        <div id="clean-groups"></div>
+      </section>
+
+      <!-- ПРИЛОЖЕНИЯ -->
+      <section class="page" id="page-apps">
+        <div class="page-head">
+          <div>
+            <h1>Приложения</h1>
+          </div>
+          <div class="head-actions">
+            <div class="seg" id="apps-seg" role="tablist" aria-label="Фильтр">
+              <button type="button" class="seg-btn is-active" data-filter="unused">Давно не запускались</button>
+              <button type="button" class="seg-btn" data-filter="all">Все</button>
+              <button type="button" class="seg-btn" data-filter="games">Игры</button>
+            </div>
+            <button type="button" class="btn btn-ghost" id="btn-apps-sort">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 3v10M2 11l2 2 2-2M9 4h5M9 8h4M9 12h3" /></svg>
+              <span id="apps-sort-label">По размеру</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="tile apps-hero" id="apps-hero">
+          <div class="apps-hero-num">
+            <span class="cap">Можно освободить</span>
+            <span class="big mono accent" id="apps-hero-size">…</span>
+          </div>
+          <p class="apps-hero-text" id="apps-hero-text">Собираю список установленных программ…</p>
+        </div>
+
+        <div class="tile panel">
+          <div class="rows apps-rows" id="apps-rows"></div>
+        </div>
+        <label class="check-line">
+          <input type="checkbox" id="apps-system" />
+          <span>Показывать системные компоненты (драйверы, SDK, библиотеки)</span>
+        </label>
+        <p class="footnote" id="apps-footnote">Дата последнего запуска берётся из Steam, журнала активности Windows (BAM) и времени последнего доступа к exe-файлу программы. Удаление запускает штатный деинсталлятор программы, а для игр Steam открывает удаление в Steam.</p>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-back" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <p id="modal-text"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="modal-cancel">Отмена</button>
+        <button type="button" class="btn btn-danger" id="modal-ok">Удалить</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
