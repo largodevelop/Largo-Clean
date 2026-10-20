@@ -99,29 +99,43 @@ function psq(text) {
 function applyAndRestart(zipPath, appDir, exePath, pid) {
   const work = path.join(os.tmpdir(), `largo-clean-update-${Date.now()}`);
   const script = path.join(os.tmpdir(), "largo-clean-apply.ps1");
+  const log = path.join(os.tmpdir(), "largo-clean-update.log");
   const lines = [
     "$ErrorActionPreference = 'Continue'",
+    `Start-Transcript -Path ${psq(log)} -Force | Out-Null`,
     `$zip = ${psq(zipPath)}`,
     `$work = ${psq(work)}`,
     `$app = ${psq(appDir)}`,
     `$exe = ${psq(exePath)}`,
-    `try { Wait-Process -Id ${Number(pid)} -Timeout 90 -ErrorAction SilentlyContinue } catch {}`,
+    `try { Wait-Process -Id ${Number(pid)} -Timeout 60 -ErrorAction SilentlyContinue } catch {}`,
+    // дождаться, пока закроются все процессы из папки программы (окна, датчики, PresentMon)
+    "function Get-AppProcs { Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($app, [StringComparison]::OrdinalIgnoreCase) } }",
+    "for ($i = 0; $i -lt 30 -and (Get-AppProcs); $i++) { Start-Sleep -Seconds 1 }",
+    "Get-AppProcs | ForEach-Object { 'kill ' + $_.Name; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
     "Start-Sleep -Seconds 1",
-    "Expand-Archive -Force -LiteralPath $zip -DestinationPath $work",
+    // tar из Windows распаковывает zip за секунды; Expand-Archive в PowerShell 5.1 — минутами
+    "New-Item -ItemType Directory -Force -Path $work | Out-Null",
+    "& tar.exe -xf $zip -C $work",
+    "if ($LASTEXITCODE -ne 0) { 'tar failed, Expand-Archive'; Expand-Archive -Force -LiteralPath $zip -DestinationPath $work }",
     "$copied = $false",
     "for ($i = 0; $i -lt 20 -and -not $copied; $i++) {",
-    "  robocopy $work $app /E /R:3 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null",
+    "  robocopy $work $app /MIR /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null",
+    "  'robocopy ' + $LASTEXITCODE",
     "  if ($LASTEXITCODE -lt 8) { $copied = $true } else { Start-Sleep -Seconds 1 }",
     "}",
     "Start-Process -FilePath $exe -WorkingDirectory $app",
     "Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue",
-    "Remove-Item -Force $zip -ErrorAction SilentlyContinue",
+    "if ($copied) { Remove-Item -Force $zip -ErrorAction SilentlyContinue }",
+    "Stop-Transcript | Out-Null",
     "Remove-Item -Force $MyInvocation.MyCommand.Path -ErrorAction SilentlyContinue",
   ];
-  fs.writeFileSync(script, "\uFEFF" + lines.join("\r\n"), "utf8");
-  // Start-Process отрывает скрипт от программы: он доживает после её закрытия
-  const launcher = `Start-Process -FilePath powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',${psq(`"${script}"`)}`;
-  const child = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", launcher], { stdio: "ignore", windowsHide: true });
+  fs.writeFileSync(script, "﻿" + lines.join("\r\n"), "utf8");
+  // detached: иначе Node держит скрипт в своём Job Object и Windows убивает его вместе с программой
+  const child = spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  });
   child.unref();
 }
 

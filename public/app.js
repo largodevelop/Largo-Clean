@@ -690,6 +690,7 @@ function setUpdate(st) {
   const pct = known ? ` (${Math.round(st.progress * 100)}%)` : "";
   btn.title = st.updating ? `Скачиваю ${st.latest}${pct}` : st.available ? `Доступно обновление ${st.latest}: нажмите, чтобы установить` : "";
   if (st.error) toast("Обновление не удалось: " + st.error);
+  if (st.updating && st.progress === 1) toast(`Устанавливаю ${st.latest} — Largo Clean откроется сам`);
 }
 $("btn-update").onclick = () => api.installUpdate();
 api.onUpdateChanged(setUpdate);
