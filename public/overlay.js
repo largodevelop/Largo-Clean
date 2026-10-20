@@ -31,7 +31,10 @@ function groups(s, hw, fps) {
     if (m.gpuTemp) v.push({ t: n0(gpu.temp), u: "°", c: hot(gpu.temp) });
     if (m.gpuClock) v.push({ t: n0(gpu.clock), u: " MHz" });
     if (m.gpuPower) v.push({ t: n0(gpu.power), u: " W" });
-    if (m.vram) v.push({ t: n1(gpu.memUsed != null ? gpu.memUsed / 1024 : null), u: " GB" });
+    if (m.vram) {
+      const used = n1(gpu.memUsed != null ? gpu.memUsed / 1024 : null);
+      v.push({ t: gpu.memTotal ? `${used}/${n0(gpu.memTotal / 1024)}` : used, u: " GB" });
+    }
     g.push(["GPU", v]);
   }
   if (cpu && (m.cpuLoad || m.cpuTemp || m.cpuClock)) {
