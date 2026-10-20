@@ -278,7 +278,7 @@ function renderTree() {
     ...parts.flatMap((path, i) => [
       i > 0 ? h("span", { class: "crumb-sep" }, "›") : null,
       h("button", { type: "button", class: "crumb", onclick: i < parts.length - 1 ? () => openTree(path) : null }, i === 0 ? path.replace(/\\$/, "") : baseName(path)),
-    ])
+    ]).filter(Boolean)
   );
 
   if (!kids.length) {
