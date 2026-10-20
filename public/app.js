@@ -134,6 +134,7 @@ function go(page) {
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("is-active", b.dataset.page === page));
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("is-active", p.id === "page-" + page));
   document.querySelector(".content").scrollTop = 0;
+  if (page === "overlay") updatePreviews();
   if (page === "apps" && !state.appsLoaded) loadApps();
 }
 document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => go(b.dataset.page)));
@@ -965,13 +966,26 @@ const METRICS = [
   ["gpuLoad", "GPU %"], ["gpuTemp", "GPU °C"], ["gpuClock", "GPU МГц"], ["gpuPower", "GPU Вт"], ["vram", "VRAM"],
   ["cpuLoad", "CPU %"], ["cpuTemp", "CPU °C"], ["cpuClock", "CPU МГц"], ["ram", "RAM"], ["time", "Время"],
 ];
-const STYLE_PREVIEWS = [
-  ["1 · строка", () => h("div", { class: "ovl-prev" }, h("span", { class: "a" }, "144"), " FPS · 6,9 ms · GPU 96% 66°")],
-  ["2 · таблица", () => h("div", { class: "ovl-prev pbox" }, h("div", {}, h("span", { class: "d" }, "GPU "), "96% 66°"), h("div", {}, h("span", { class: "d" }, "CPU "), "38% 61°"), h("div", {}, h("span", { class: "d" }, "FPS "), h("span", { class: "a" }, "144"), " 6,9"))],
-  ["3 · пилюли", () => h("div", { class: "ovl-prev", style: "display:flex;gap:4px;flex-wrap:wrap" }, h("span", { style: "background:rgba(10,10,12,.7);padding:2px 6px;border-radius:99px" }, h("span", { class: "a" }, "144 FPS")), h("span", { style: "background:rgba(10,10,12,.7);padding:2px 6px;border-radius:99px" }, "GPU 96%"))],
-  ["4 · график", () => h("div", { class: "ovl-prev pbox" }, h("div", {}, h("span", { class: "a" }, "144 FPS"), " 6,9 ms"), svg('<svg width="90" height="18" viewBox="0 0 90 18"><polyline points="0,10 10,9 20,11 30,8 40,10 50,3 60,10 70,9 80,14 90,9" fill="none" stroke="#67d4f0" stroke-width="1.3"/></svg>'))],
-  ["5 · только FPS", () => h("div", { class: "ovl-prev" }, h("div", { class: "a", style: "font-size:22px;font-weight:700;line-height:1" }, "144"), h("div", {}, "6,9 ms"))],
-];
+const STYLE_LABELS = ["1 · строка", "2 · таблица", "3 · пилюли", "4 · график", "5 · только FPS"];
+let lastFps = null;
+
+// Пока игра не запущена — показываем в превью правдоподобные кадры, остальное живое с датчиков
+function previewFps() {
+  if (lastFps && lastFps.game && lastFps.fps != null) return lastFps;
+  const graph = Array.from({ length: 80 }, (_, i) => 6.9 + Math.sin(i * 0.7) * 0.4 + (i % 23 === 0 ? 5 : 0));
+  return { fps: 144, frametime: 6.9, low1: 118, graph };
+}
+
+// Превью рисует тот же код, что и окно оверлея: выбранные показатели видны сразу
+function updatePreviews() {
+  const o = state.overlay;
+  if (!o) return;
+  document.querySelectorAll(".ovl-style").forEach((card) => {
+    const style = Number(card.dataset.style);
+    const box = card.querySelector(".lo");
+    box.replaceChildren(...window.LargoOverlay.build({ settings: { ...o, style }, hw: state.hw, fps: previewFps() }));
+  });
+}
 
 function renderOverlay() {
   const o = state.overlay;
@@ -979,10 +993,16 @@ function renderOverlay() {
   $("ovl-enabled").setAttribute("aria-checked", String(o.enabled));
   $("nav-overlay-badge").hidden = !o.enabled;
   $("ovl-styles").replaceChildren(
-    ...STYLE_PREVIEWS.map(([label, make], i) =>
-      h("button", { type: "button", class: "ovl-style" + (o.style === i + 1 ? " is-active" : ""), "aria-pressed": String(o.style === i + 1), onclick: () => setOverlay({ style: i + 1 }) }, make(), h("span", { class: "lbl" }, label))
+    ...STYLE_LABELS.map((label, i) =>
+      h(
+        "button",
+        { type: "button", class: "ovl-style" + (o.style === i + 1 ? " is-active" : ""), "data-style": String(i + 1), "aria-pressed": String(o.style === i + 1), onclick: () => setOverlay({ style: i + 1 }) },
+        h("div", { class: "ovl-live" }, h("div", { class: "lo" })),
+        h("span", { class: "lbl" }, label)
+      )
     )
   );
+  updatePreviews();
   $("ovl-metrics").replaceChildren(
     ...METRICS.map(([k, label]) => h("button", { type: "button", class: "chip-t", "aria-pressed": String(Boolean(o.metrics[k])), onclick: () => setOverlay({ metrics: { [k]: !o.metrics[k] } }) }, label))
   );
@@ -1021,6 +1041,7 @@ $("ovl-hotkey").addEventListener("keydown", (e) => {
 });
 api.onOverlaySettings((o) => ((state.overlay = o), renderOverlay()));
 api.onFps((f) => {
+  lastFps = f;
   $("ov-fps-meta").textContent = f.fps != null ? `${f.app || "игра"} · ${f.fps} FPS` : f.error || "игра не найдена";
 });
 
@@ -1028,6 +1049,7 @@ api.onFps((f) => {
 api.onHwSample((x) => {
   state.hw = x;
   renderMonitor(x); // и в фоне: история графиков копится с запуска
+  if (document.querySelector("#page-overlay.is-active")) updatePreviews();
   if (document.querySelector("#page-fans.is-active") || !fanUi.selected) renderFans(x);
 });
 (async () => {

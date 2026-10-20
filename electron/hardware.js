@@ -158,7 +158,7 @@ function setupHardware({ app, getMainWindow }) {
     const st = fps.stats(fg && !isOwn ? fg.pid : -1);
     const gameActive = st.fps != null && fg && !isOwn && st.pid === fg.pid;
 
-    sendMain("hw:fps", st);
+    sendMain("hw:fps", { ...st, game: Boolean(gameActive) });
     const show = overlay.enabled && (!overlay.onlyGames || gameActive);
     if (!show) {
       if (overlayWin && overlayWin.isVisible()) overlayWin.hide();

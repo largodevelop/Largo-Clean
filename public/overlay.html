@@ -3,28 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <title>Largo Overlay</title>
+  <link rel="stylesheet" href="overlay.css" />
   <style>
-    @font-face { font-family: "JB"; src: local("JetBrains Mono"), local("JetBrainsMono-Regular"), local("Consolas"); }
-    html, body { margin: 0; background: transparent; overflow: hidden; }
-    body { font-family: "JetBrains Mono", Consolas, ui-monospace, monospace; font-variant-numeric: tabular-nums; color: #f4f4f5; user-select: none; }
+    html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
     #root { display: inline-block; transform-origin: top left; }
-    .accent { color: #67d4f0; }
-    .dim { color: #9a9aa2; }
-    .hot { color: #c4a574; }
-    .shadow { text-shadow: 0 1px 2px #000, 0 0 3px #000; }
-    .line { font-size: 13px; font-weight: 500; white-space: nowrap; padding: 2px 4px; }
-    .box { padding: 8px 10px; border-radius: 8px; font-size: 13px; }
-    .grid { display: grid; grid-template-columns: auto auto auto; gap: 3px 10px; }
-    .grid .r { text-align: right; }
-    .pills { display: flex; gap: 6px; flex-wrap: wrap; max-width: 380px; font-size: 12.5px; }
-    .pill { padding: 4px 10px; border-radius: 999px; }
-    .big { font-size: 34px; font-weight: 700; line-height: 1; }
-    .small { font-size: 11px; margin-top: 2px; }
-    .row { display: flex; justify-content: space-between; gap: 14px; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root" class="lo"></div>
+  <script src="overlay-render.js"></script>
   <script src="overlay.js"></script>
 </body>
 </html>

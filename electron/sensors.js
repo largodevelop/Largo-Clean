@@ -71,7 +71,8 @@ function createSensors({ app, onSample, onError }) {
 
 /** Установлен ли драйвер PawnIO (нужен LibreHardwareMonitor для температуры CPU и вентиляторов платы). */
 function pawnioInstalled() {
-  return new Promise((resolve) => execFile("sc", ["query", "PawnIO"], { windowsHide: true }, (err, out) => resolve(!err && /STATE/.test(out || ""))));
+  // вывод sc локализован («Состояние» вместо STATE), а тип драйвера — нет
+  return new Promise((resolve) => execFile("sc", ["query", "PawnIO"], { windowsHide: true }, (err, out) => resolve(!err && /KERNEL_DRIVER/.test(out || ""))));
 }
 
 module.exports = { createSensors, pawnioInstalled, binDir };

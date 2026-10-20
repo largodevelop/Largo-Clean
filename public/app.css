@@ -463,3 +463,10 @@ button:focus-visible, input:focus-visible, .clean-row:focus-visible { outline: 2
 .range-line .mono { width: 48px; text-align: right; font-size: 12px; color: var(--text-muted-sm); }
 .hotkey-input { flex: 1; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-input); color: var(--text); padding: 0 10px; font-size: 12px; cursor: pointer; }
 .hotkey-input:focus { outline: 1.5px solid var(--accent); }
+
+/* превью стилей оверлея: живая отрисовка, ужатая под карточку */
+.ovl-style { min-height: 150px; overflow: hidden; }
+.ovl-live { flex: 1; min-height: 0; overflow: hidden; }
+.ovl-live .lo { display: inline-block; transform: scale(0.62); transform-origin: top left; }
+.ovl-live .lo-line { white-space: normal; width: 220px; }
+.ovl-live .lo-pills { width: 230px; }
